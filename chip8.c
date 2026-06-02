@@ -12,8 +12,8 @@ typedef uint8_t register8;
 typedef uint16_t register16;
 
 const byte builtin_sprites[80] = {
-    0xF0,0x90,0x90,0x90,0xF0,      // 0
-    0x20,0x60,0x20,0x20,0x70,      // 1
+    0xF0,0x90,0x90,0x90,0xF0, // 0
+    0x20,0x60,0x20,0x20,0x70, // 1
     0xF0,0x10,0xF0,0x80,0xF0, // 2
     0xF0,0x10,0xF0,0x10,0xF0, // 3
     0x90,0x90,0xF0,0x10,0x10, // 4
@@ -115,7 +115,35 @@ void print_instruction(instruction inst) {
     printf("y: %x\n", inst.y);
 }
 
+void handle_H4B0(instruction inst) {
+    switch(inst.nnn) {
+        case 0x0E0:
+            //CLS
+            break;
+        case 0x0EE:
+            //RET
+            break;
+        default:
+            //SYS nnn
+            break;
+    }
+}
 
+void handle_instruction(instruction inst) {
+    switch(inst.h4b) {
+        case 0x0:
+            handle_H4B0(inst);
+            break;
+        case 0x1:
+            //JMP nnn
+            break;
+        case 0x2:
+            //CALL nnn
+            break;
+        default:
+            break;
+    }
+}
 
 int main(void) {
     cpu cpu = {0};
