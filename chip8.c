@@ -7,11 +7,7 @@
 
 #define PROGRAM_MEMORY_OFFSET 0x1FF
 
-typedef uint8_t byte;
-typedef uint8_t register8;
-typedef uint16_t register16;
-
-const byte builtin_sprites[80] = {
+const uint8_t builtin_sprites[80] = {
     0xF0,0x90,0x90,0x90,0xF0, // 0
     0x20,0x60,0x20,0x20,0x70, // 1
     0xF0,0x10,0xF0,0x80,0xF0, // 2
@@ -42,14 +38,14 @@ typedef struct {
 } instruction;
 
 typedef struct {
-    byte memory[4096];
-    register8 V[16];
-    register8 DT;
-    register8 ST;
-    register8 SP;
-    register16 stack[16];
-    register16 I;
-    register16 PC;
+    uint8_t memory[4096];
+    uint8_t V[16];
+    uint8_t DT;
+    uint8_t ST;
+    uint8_t SP;
+    uint16_t stack[16];
+    uint16_t I;
+    uint16_t PC;
 } cpu;
 
 void clear_term() {
@@ -58,11 +54,11 @@ void clear_term() {
 }
 
 void setup_memory(cpu* cpu) {
-    memcpy(cpu->memory, builtin_sprites, 80 * sizeof(byte));
+    memcpy(cpu->memory, builtin_sprites, 80 * sizeof(uint8_t));
     cpu->PC = (PROGRAM_MEMORY_OFFSET + 1);
 }
 
-void load_program(cpu* cpu, byte* buffer, size_t buffer_size) {
+void load_program(cpu* cpu, uint8_t* buffer, size_t buffer_size) {
     memcpy((cpu->memory + PROGRAM_MEMORY_OFFSET + 1), buffer, buffer_size);
 }
 
@@ -83,7 +79,7 @@ void dump_registers(cpu* cpu) {
     registry_print("PC", cpu->PC);
 }
 
-void dump_memory(cpu cpu) {
+void dump_memory(cpu* cpu) {
     FILE* fp = fopen("memdump.hex", "wb");
 
     if(fp == NULL) {
@@ -91,7 +87,7 @@ void dump_memory(cpu cpu) {
         return;
     }
 
-    fwrite(cpu.memory, sizeof(byte), 4096, fp);
+    fwrite(cpu->memory, sizeof(uint8_t), 4096, fp);
 }
 
 instruction decode_instruction(uint16_t inst) {
@@ -129,6 +125,87 @@ void handle_H4B0(instruction inst) {
     }
 }
 
+void handle_H4B8(instruction inst) {
+    switch(inst.n) {
+        case 0x0:
+            //LD Vx, Vy
+            break;
+        case 0x1:
+            //OR Vx, Vy
+            break;
+        case 0x2:
+            //AND Vx, Vy
+            break;
+        case 0x3:
+            //XOR Vx, Vy
+            break;
+        case 0x4:
+            //ADD Vx, Vy
+            break;
+        case 0x5:
+            //SUB Vx, Vy
+            break;
+        case 0x6:
+            //SHR Vx
+            break;
+        case 0x7:
+            //SUBN Vx, Vy
+            break;
+        case 0xE:
+            //SHL Vx
+            break;
+        default:
+            break;
+    }
+}
+
+void handle_H4BE(instruction inst) {
+    switch (inst.kk) {
+        case 0x9E:
+            //SKP Vx
+            break;
+        case 0xA1:
+            //SKNP Vx
+            break;
+        default:
+            break;
+    }
+}
+
+void handle_H4BF(instruction inst) {
+    switch (inst.kk) {
+        case 0x07:
+            //LD Vx, DT
+            break;
+        case 0x0A:
+            //LD Vx, K
+            break;
+        case 0x15:
+            //LD DT, Vx
+            break;
+        case 0x18:
+            //LD ST, Vx
+            break;
+        case 0x1E:
+            //ADD I, Vx
+            break;
+        case 0x29:
+            //LD F, Vx
+            break;
+        case 0x33:
+            //LD B, Vx
+            break;
+        case 0x55:
+            //LD [I], Vx
+            break;
+        case 0x65:
+            //LD Vx, [I]
+            break;
+        default:
+            break;
+    }
+}
+
 void handle_instruction(instruction inst) {
     switch(inst.h4b) {
         case 0x0:
@@ -140,14 +217,70 @@ void handle_instruction(instruction inst) {
         case 0x2:
             //CALL nnn
             break;
+        case 0x3:
+            //SE Vx, kk
+            break;
+        case 0x4:
+            //SNE Vx, kk
+            break;
+        case 0x5:
+            //SE Vx, Vy
+            break;
+        case 0x6:
+            //LD Vx, kk
+            break;
+        case 0x7:
+            //ADD Vx, kk
+            break;
+        case 0x8:
+            handle_H4B8(inst);
+            break;
+        case 0x9:
+            //SNE Vx, Vy
+            break;
+        case 0xA:
+            //LD I, nnn
+            break;
+        case 0xB:
+            //JP V0, nnn
+            break;
+        case 0xC:
+            //RND Vx, kk
+            break;
+        case 0xD:
+            //DRW Vx, Vy, n
+            break;
+        case 0xE:
+            handle_H4BE(inst);
+            break;
+        case 0xF:
+            handle_H4BF(inst);
+            break;
         default:
             break;
     }
+}
+
+void cycle(cpu* cpu) {
+    uint8_t hb = cpu->memory[cpu->PC];
+    uint8_t lb = cpu->memory[cpu->PC + 1];
+
+    uint16_t binst = ((uint16_t) hb << 8) | lb;
+    instruction inst = decode_instruction(binst);
+
+    handle_instruction(inst);
+
+    cpu->PC += 2;
 }
 
 int main(void) {
     cpu cpu = {0};
     setup_memory(&cpu);
     
-    instruction inst = decode_instruction(0xF265);
+    uint8_t program[2] = {0xFA, 0x07};
+    load_program(&cpu, program, sizeof(program));
+    cycle(&cpu);
+
+    dump_memory(&cpu);
+    dump_registers(&cpu);
 }
