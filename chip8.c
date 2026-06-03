@@ -1,15 +1,6 @@
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-#define PROGRAM_MEMORY_OFFSET 0x1FF
-
-#define CONTINUE_CYCLE 0
-#define EOP 1
-#define ERROR_CODE -1
+#include "chip8.h"
+#include "instructions.h"
+#include <time.h>
 
 char* last_cycle_error;
 
@@ -31,34 +22,6 @@ const uint8_t builtin_sprites[80] = {
     0xF0,0x80,0xF0,0x80,0xF0, // E
     0xF0,0x80,0xF0,0x80,0x80  // F
 };
-
-//Big endian
-//Let a 2 byte instruction 0xABCD
-typedef struct {
-    uint8_t A;    //Highest 4-bits
-    uint8_t B;      //Lowest 4-bits of the highest byte
-    uint8_t C;      //Upper 4-bits of the lowest byte
-    uint8_t D;      //Lowest 4-bits
-    uint8_t CD;     //Lowest 8 bits;
-    uint16_t BCD;   //Lowest 12-bits
-    uint16_t ABCD; //Full instruction
-} instruction;
-
-typedef struct {
-    uint8_t memory[4096];
-    uint8_t V[16];
-    uint8_t DT;
-    uint8_t ST;
-    uint8_t SP;
-    uint16_t stack[16];
-    uint16_t I;
-    uint16_t PC;
-} cpu;
-
-void clear_term() {
-    printf("\e[H\e[2J");
-    printf("\e[3J"); 
-}
 
 void setup_memory(cpu* cpu) {
     memcpy(cpu->memory, builtin_sprites, 80 * sizeof(uint8_t));
@@ -109,16 +72,6 @@ instruction decode_instruction(uint16_t inst) {
     };
 }
 
-void print_instructions(instruction inst) {
-    printf("A: %x\n", inst.A);
-    printf("B: %x\n", inst.B);
-    printf("C: %x\n", inst.C);
-    printf("D: %x\n", inst.D);
-    printf("CD: %x\n", inst.CD);
-    printf("BCD: %x\n", inst.BCD);
-    printf("ABCD: %x\n", inst.ABCD);
-}
-
 int handle_stack_over_or_under_flow(cpu* cpu) {
     if(cpu->SP <= 0 || cpu->SP > 16) {
         last_cycle_error = malloc(16 * sizeof(char));
@@ -135,15 +88,12 @@ int handle_stack_over_or_under_flow(cpu* cpu) {
 int handle_H4B0(cpu *cpu, instruction inst) {
     switch(inst.BCD) {
         case 0x0E0:
-            clear_term();
+            i_display_device_CLS(cpu);
             break;
         case 0x0EE:
-            if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
-            cpu->PC = cpu->stack[cpu->SP];
-            cpu->SP--;
+            i_RET(cpu);
             break;
         default:
-            printf("SYS Instruction\n");
             //SYS nnn
             break;
     }
@@ -152,39 +102,49 @@ int handle_H4B0(cpu *cpu, instruction inst) {
 }
 
 int handle_H4B8(cpu *cpu, instruction inst) {
+    int ret = CONTINUE_CYCLE;
     switch(inst.D) {
         case 0x0:
-            //LD Vx, Vy
+            ret = i_LD(cpu, &cpu->V[inst.B], cpu->V[inst.C]);
             break;
         case 0x1:
-            //OR Vx, Vy
+            //Continue substitution
+            cpu->V[inst.B] |= cpu->V[inst.C];
             break;
         case 0x2:
-            //AND Vx, Vy
+            cpu->V[inst.B] &= cpu->V[inst.C];
             break;
         case 0x3:
-            //XOR Vx, Vy
+            cpu->V[inst.B] ^= cpu->V[inst.C];
             break;
-        case 0x4:
-            //ADD Vx, Vy
+        case 0x4: { //Stop the compiler from bitching warnings
+            uint16_t add = cpu->V[inst.B] + cpu->V[inst.C];
+            cpu->V[0xF] = add > 255;
+            cpu->V[inst.B] = (uint8_t)(add & 0x00FF);
             break;
-        case 0x5:
-            //SUB Vx, Vy
+        }
+        case 0x5: {
+            cpu->V[0xF] = cpu->V[inst.B] > cpu->V[inst.C];
+            cpu->V[inst.B] -= cpu->V[inst.C];
             break;
+        }
         case 0x6:
-            //SHR Vx
+            cpu->V[0xF] = cpu->V[inst.B] & (0b00000001);
+            cpu->V[inst.B] >>= 1;
             break;
         case 0x7:
-            //SUBN Vx, Vy
+            cpu->V[0xF] = cpu->V[inst.C] > cpu->V[inst.B];
+            cpu->V[inst.B] = cpu->V[inst.C] - cpu->V[inst.B];
             break;
         case 0xE:
-            //SHL Vx
+            cpu->V[0xF] = cpu->V[inst.B] >> 7;
+            cpu->V[inst.B] <<= 1;
             break;
         default:
             break;
     }
 
-    return CONTINUE_CYCLE;
+    return ret;
 }
 
 int handle_H4BE(cpu *cpu, instruction inst) {
@@ -239,45 +199,43 @@ int handle_H4BF(cpu *cpu, instruction inst) {
 }
 
 int handle_instruction(cpu *cpu, instruction inst) {
+    uint8_t ret = CONTINUE_CYCLE;
     switch(inst.A) {
         case 0x0:
-            return handle_H4B0(cpu, inst);
+            ret = handle_H4B0(cpu, inst);
             break;
         case 0x1:
-            cpu->PC = inst.BCD;
+            ret = i_JP(cpu, inst.BCD);
             break;
         case 0x2:
-            if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
-            cpu->stack[cpu->SP] = cpu->PC;
-            cpu->SP++;
-            cpu->PC = inst.BCD;
+            ret = i_CALL(cpu, inst.BCD);
             break;
         case 0x3:
-            //SE Vx, kk
+            ret = i_SE(cpu, cpu->V[inst.B], inst.CD);
             break;
         case 0x4:
-            //SNE Vx, kk
+            ret = i_SNE(cpu, cpu->V[inst.B], inst.CD);
             break;
         case 0x5:
-            //SE Vx, Vy
+            ret = i_SE(cpu, cpu->V[inst.B], cpu->V[inst.C]);
             break;
         case 0x6:
-            //LD Vx, kk
+            ret = i_LD(cpu, &cpu->V[inst.B], inst.CD);
             break;
         case 0x7:
-            //ADD Vx, kk
+            ret = i_ADD(cpu, &cpu->V[inst.B], cpu->V[inst.B], inst.CD, 0);
             break;
         case 0x8:
             return handle_H4B8(cpu, inst);
             break;
         case 0x9:
-            //SNE Vx, Vy
+            if(cpu->V[inst.B] != cpu->V[inst.C]) cpu->PC += 2;
             break;
         case 0xA:
-            //LD I, nnn
+            cpu->I = inst.BCD;
             break;
         case 0xB:
-            //JP V0, nnn
+            cpu->PC = cpu->V[0x0] + inst.BCD;
             break;
         case 0xC:
             //RND Vx, kk
@@ -295,7 +253,7 @@ int handle_instruction(cpu *cpu, instruction inst) {
             break;
     }
 
-    return CONTINUE_CYCLE;
+    return ret;
 }
 
 int cycle(cpu* cpu) {
@@ -314,6 +272,8 @@ int cycle(cpu* cpu) {
 }
 
 int main(void) {
+    srand(time(NULL));
+
     cpu cpu = {0};
     setup_memory(&cpu);
 
