@@ -1,7 +1,21 @@
-C = gcc
+TARGET = chip8
 
-all: chip8.o
-	$(C) -o chip8 chip8.o
+CC = gcc
+CC_FLAGS = -c -Wall
 
-chip8.o: chip8.c
-	$(C) -c chip8.c
+C_SRC = $(wildcard *.c)
+H_SRC = $(wildcard *.h)
+OBJ=$(C_SRC:.c=.o)
+
+all: $(TARGET)
+
+#linking
+$(TARGET): $(OBJ)
+	$(CC) -o $@ $^
+	
+%.o: %.c %.h
+	$(CC) $(CC_FLAGS) -o $@ $<
+
+clean:
+	rm -rf *.o
+

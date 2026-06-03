@@ -7,6 +7,12 @@
 
 #define PROGRAM_MEMORY_OFFSET 0x1FF
 
+#define CONTINUE_CYCLE 0
+#define EOP 1
+#define ERROR_CODE -1
+
+char* last_cycle_error;
+
 const uint8_t builtin_sprites[80] = {
     0xF0,0x90,0x90,0x90,0xF0, // 0
     0x20,0x60,0x20,0x20,0x70, // 1
@@ -111,21 +117,39 @@ void print_instruction(instruction inst) {
     printf("y: %x\n", inst.y);
 }
 
-void handle_H4B0(instruction inst) {
+int handle_stack_over_or_under_flow(cpu* cpu) {
+    if(cpu->SP <= 0 || cpu->SP > 16) {
+        last_cycle_error = malloc(16 * sizeof(char));
+        snprintf(last_cycle_error,
+                16 * sizeof(char),
+                "stack_%s",
+                cpu->SP <= 0 ? "underflow" : "overflow");
+        return ERROR_CODE;
+    }
+
+    return 0;
+}
+
+int handle_H4B0(cpu *cpu, instruction inst) {
     switch(inst.nnn) {
         case 0x0E0:
-            //CLS
+            clear_term();
             break;
         case 0x0EE:
-            //RET
+            if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
+            cpu->PC = cpu->stack[cpu->SP];
+            cpu->SP--;
             break;
         default:
+            printf("SYS Instruction\n");
             //SYS nnn
             break;
     }
+
+    return CONTINUE_CYCLE;
 }
 
-void handle_H4B8(instruction inst) {
+int handle_H4B8(cpu *cpu, instruction inst) {
     switch(inst.n) {
         case 0x0:
             //LD Vx, Vy
@@ -157,9 +181,11 @@ void handle_H4B8(instruction inst) {
         default:
             break;
     }
+
+    return CONTINUE_CYCLE;
 }
 
-void handle_H4BE(instruction inst) {
+int handle_H4BE(cpu *cpu, instruction inst) {
     switch (inst.kk) {
         case 0x9E:
             //SKP Vx
@@ -170,9 +196,11 @@ void handle_H4BE(instruction inst) {
         default:
             break;
     }
+
+    return CONTINUE_CYCLE;
 }
 
-void handle_H4BF(instruction inst) {
+int handle_H4BF(cpu *cpu, instruction inst) {
     switch (inst.kk) {
         case 0x07:
             //LD Vx, DT
@@ -204,18 +232,23 @@ void handle_H4BF(instruction inst) {
         default:
             break;
     }
+
+    return CONTINUE_CYCLE;
 }
 
-void handle_instruction(instruction inst) {
+int handle_instruction(cpu *cpu, instruction inst) {
     switch(inst.h4b) {
         case 0x0:
-            handle_H4B0(inst);
+            return handle_H4B0(cpu, inst);
             break;
         case 0x1:
-            //JMP nnn
+            cpu->PC = inst.nnn;
             break;
         case 0x2:
-            //CALL nnn
+            if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
+            cpu->stack[cpu->SP] = cpu->PC;
+            cpu->SP++;
+            cpu->PC = inst.nnn;
             break;
         case 0x3:
             //SE Vx, kk
@@ -233,7 +266,7 @@ void handle_instruction(instruction inst) {
             //ADD Vx, kk
             break;
         case 0x8:
-            handle_H4B8(inst);
+            return handle_H4B8(cpu, inst);
             break;
         case 0x9:
             //SNE Vx, Vy
@@ -251,36 +284,50 @@ void handle_instruction(instruction inst) {
             //DRW Vx, Vy, n
             break;
         case 0xE:
-            handle_H4BE(inst);
+            return handle_H4BE(cpu, inst);
             break;
         case 0xF:
-            handle_H4BF(inst);
+            return handle_H4BF(cpu, inst);
             break;
         default:
             break;
     }
+
+    return CONTINUE_CYCLE;
 }
 
-void cycle(cpu* cpu) {
+int cycle(cpu* cpu) {
+    if(cpu->PC >= sizeof(cpu->memory)) return EOP;
     uint8_t hb = cpu->memory[cpu->PC];
     uint8_t lb = cpu->memory[cpu->PC + 1];
 
     uint16_t binst = ((uint16_t) hb << 8) | lb;
     instruction inst = decode_instruction(binst);
 
-    handle_instruction(inst);
+    int code = handle_instruction(cpu ,inst);
 
     cpu->PC += 2;
+
+    return code;
 }
 
 int main(void) {
     cpu cpu = {0};
     setup_memory(&cpu);
-    
-    uint8_t program[2] = {0xFA, 0x07};
-    load_program(&cpu, program, sizeof(program));
-    cycle(&cpu);
 
-    dump_memory(&cpu);
-    dump_registers(&cpu);
+    int should_quit = 0;
+    int quit_reason = 0;
+
+    while(!should_quit) {
+        int code = cycle(&cpu);
+
+        if(code != CONTINUE_CYCLE) {
+            should_quit = 1;
+            quit_reason = code;
+        }
+    }
+
+    if(quit_reason == ERROR_CODE) {
+        printf("%s", last_cycle_error);
+    }
 }
