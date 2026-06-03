@@ -33,14 +33,15 @@ const uint8_t builtin_sprites[80] = {
 };
 
 //Big endian
+//Let a 2 byte instruction 0xABCD
 typedef struct {
-    uint8_t h4b;    //Highest 4-bits
-    uint8_t n;      //Lowest 4-bits
-    uint8_t x;      //Lowest 4-bits of the highest byte
-    uint8_t y;      //Upper 4-bits of the lowest byte
-    uint8_t kk;     //Lowest 8 bits;
-    uint16_t nnn;   //Lowest 12-bits
-    uint16_t finst; //Full instruction
+    uint8_t A;    //Highest 4-bits
+    uint8_t B;      //Lowest 4-bits of the highest byte
+    uint8_t C;      //Upper 4-bits of the lowest byte
+    uint8_t D;      //Lowest 4-bits
+    uint8_t CD;     //Lowest 8 bits;
+    uint16_t BCD;   //Lowest 12-bits
+    uint16_t ABCD; //Full instruction
 } instruction;
 
 typedef struct {
@@ -98,23 +99,24 @@ void dump_memory(cpu* cpu) {
 
 instruction decode_instruction(uint16_t inst) {
     return (instruction) {
-        .h4b   = inst >> 12,
-        .kk    = inst & 0x00FF,
-        .n     = inst & 0x000F,
-        .nnn   = inst & 0x0FFF,
-        .x     = (inst >> 8) & 0x0F,
-        .y     = (inst & 0x00FF) >> 4,
-        .finst = inst
+        .A   = inst >> 12,
+        .CD    = inst & 0x00FF,
+        .D     = inst & 0x000F,
+        .BCD   = inst & 0x0FFF,
+        .B     = (inst >> 8) & 0x0F,
+        .C     = (inst & 0x00FF) >> 4,
+        .ABCD = inst
     };
 }
 
-void print_instruction(instruction inst) {
-    printf("h4b: %x\n", inst.h4b);
-    printf("kk: %x\n", inst.kk);
-    printf("n: %x\n", inst.n);
-    printf("nnn: %x\n", inst.nnn);
-    printf("x: %x\n", inst.x);
-    printf("y: %x\n", inst.y);
+void print_instructions(instruction inst) {
+    printf("A: %x\n", inst.A);
+    printf("B: %x\n", inst.B);
+    printf("C: %x\n", inst.C);
+    printf("D: %x\n", inst.D);
+    printf("CD: %x\n", inst.CD);
+    printf("BCD: %x\n", inst.BCD);
+    printf("ABCD: %x\n", inst.ABCD);
 }
 
 int handle_stack_over_or_under_flow(cpu* cpu) {
@@ -131,7 +133,7 @@ int handle_stack_over_or_under_flow(cpu* cpu) {
 }
 
 int handle_H4B0(cpu *cpu, instruction inst) {
-    switch(inst.nnn) {
+    switch(inst.BCD) {
         case 0x0E0:
             clear_term();
             break;
@@ -150,7 +152,7 @@ int handle_H4B0(cpu *cpu, instruction inst) {
 }
 
 int handle_H4B8(cpu *cpu, instruction inst) {
-    switch(inst.n) {
+    switch(inst.D) {
         case 0x0:
             //LD Vx, Vy
             break;
@@ -186,7 +188,7 @@ int handle_H4B8(cpu *cpu, instruction inst) {
 }
 
 int handle_H4BE(cpu *cpu, instruction inst) {
-    switch (inst.kk) {
+    switch (inst.CD) {
         case 0x9E:
             //SKP Vx
             break;
@@ -201,7 +203,7 @@ int handle_H4BE(cpu *cpu, instruction inst) {
 }
 
 int handle_H4BF(cpu *cpu, instruction inst) {
-    switch (inst.kk) {
+    switch (inst.CD) {
         case 0x07:
             //LD Vx, DT
             break;
@@ -237,18 +239,18 @@ int handle_H4BF(cpu *cpu, instruction inst) {
 }
 
 int handle_instruction(cpu *cpu, instruction inst) {
-    switch(inst.h4b) {
+    switch(inst.A) {
         case 0x0:
             return handle_H4B0(cpu, inst);
             break;
         case 0x1:
-            cpu->PC = inst.nnn;
+            cpu->PC = inst.BCD;
             break;
         case 0x2:
             if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
             cpu->stack[cpu->SP] = cpu->PC;
             cpu->SP++;
-            cpu->PC = inst.nnn;
+            cpu->PC = inst.BCD;
             break;
         case 0x3:
             //SE Vx, kk
