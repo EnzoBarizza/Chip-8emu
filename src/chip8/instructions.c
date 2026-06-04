@@ -134,10 +134,34 @@ int i_input_device_SKNP(cpu *cpu) {
     return CONTINUE_CYCLE;
 }
 
-int i_LD_Fx33(cpu* cpu, uint8_t val) {
+int i_input_device_LD_Vx_K(cpu *cpu) {
+    printf("LD Vx, K WIP");
+    return CONTINUE_CYCLE;
+}
+
+int i_Fx33(cpu* cpu, uint8_t val) {
     cpu->memory[cpu->I + 2] = val % 10;
     cpu->memory[cpu->I + 1] = (val / 10) % 10;
     cpu->memory[cpu->I]     = val / 100;
 
+    return CONTINUE_CYCLE;
+}
+
+int i_Fx29(cpu* cpu, uint8_t val) {
+    cpu->I = val * 5;
+    return CONTINUE_CYCLE;
+}
+
+int i_Fx55(cpu* cpu, uint8_t x) {
+    for(int i = 0; i <= x; i++) {
+        cpu->memory[cpu->I + x] = cpu->V[x];
+    }
+    return CONTINUE_CYCLE;
+}
+
+int i_Fx65(cpu* cpu, uint8_t x) {
+    for(int i = 0; i <= x; i++) {
+        cpu->V[x] = cpu->memory[cpu->I + x];
+    }
     return CONTINUE_CYCLE;
 }

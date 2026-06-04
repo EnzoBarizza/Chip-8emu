@@ -13,6 +13,8 @@ int main(void) {
     int should_quit = 0;
     int quit_reason = 0;
 
+    load_program(&cpu, (uint8_t[]){ 0x00, 0xE0 }, 2);
+
     while(!should_quit) {
         int code = cycle(&cpu);
 

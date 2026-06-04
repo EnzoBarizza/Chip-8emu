@@ -22,11 +22,16 @@ int i_SUBN(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2);
 int i_SHL(cpu* cpu, uint8_t* victim);
 int i_RND(cpu* cpu, uint8_t* dest, uint8_t and);
 
-
-//Unique Instructions
+//Device Instructions
 int i_display_device_CLS(cpu* cpu);
 int i_display_device_DRW(cpu* cpu);
 int i_input_device_SKP(cpu* cpu);
 int i_input_device_SKNP(cpu* cpu);
-int i_LD_Fx33(cpu* cpu, uint8_t val);
+int i_input_device_LD_Vx_K(cpu* cpu);
+
+//Unique Instructions
+int i_Fx33(cpu* cpu, uint8_t val);
+int i_Fx29(cpu* cpu, uint8_t val);
+int i_Fx55(cpu* cpu, uint8_t x);
+int i_Fx65(cpu* cpu, uint8_t x);
 #endif

@@ -160,7 +160,7 @@ int handle_H4BF(cpu *cpu, instruction inst) {
             ret = i_LD(cpu, &cpu->V[inst.B], cpu->DT);
             break;
         case 0x0A:
-            //LD Vx, K
+            ret = i_input_device_LD_Vx_K(cpu);
             break;
         case 0x15:
             ret = i_LD(cpu, &cpu->DT, cpu->V[inst.B]);
@@ -172,16 +172,16 @@ int handle_H4BF(cpu *cpu, instruction inst) {
             ret = i_ADD16(cpu, &cpu->I, cpu->V[inst.B], cpu->I, 0);
             break;
         case 0x29:
-            //LD F, Vx
+            ret = i_Fx29(cpu, cpu->V[inst.B]);
             break;
         case 0x33:
-            i_LD_Fx33(cpu, cpu->V[inst.B]);
+            ret = i_Fx33(cpu, cpu->V[inst.B]);
             break;
         case 0x55:
-            //LD [I], Vx
+            ret = i_Fx55(cpu, inst.B);
             break;
         case 0x65:
-            //LD Vx, [I]
+            ret = i_Fx65(cpu, inst.B);
             break;
         default:
             break;
