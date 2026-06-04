@@ -46,7 +46,24 @@ int i_LD(cpu* cpu, uint8_t* dest, uint8_t src) {
     return CONTINUE_CYCLE;
 }
 
+int i_LD16(cpu* cpu, uint16_t* dest, uint16_t src) {
+    *dest = src;
+    return CONTINUE_CYCLE;
+}
+
 int i_ADD(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_carry) {
+    if(set_carry) {
+        uint16_t add = v1 + v2;
+        cpu->V[0xF] = add > 255;
+        *dest = (uint8_t)(add & 0x00FF);
+    } else {
+        *dest = v1 + v2;
+    }
+    
+    return CONTINUE_CYCLE;
+}
+
+int i_ADD16(cpu* cpu, uint16_t* dest, uint16_t v1, uint16_t v2, int set_carry) {
     if(set_carry) {
         uint16_t add = v1 + v2;
         cpu->V[0xF] = add > 255;
@@ -85,7 +102,7 @@ int i_SHR(cpu* cpu, uint8_t* victim) {
     return CONTINUE_CYCLE;
 }
 
-int i_SUBN(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_not_borrow) {
+int i_SUBN(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2) {
     cpu->V[0xF] = v2 > v1;
     *dest = v2 - v1;
     return CONTINUE_CYCLE;
@@ -114,5 +131,13 @@ int i_input_device_SKP(cpu *cpu) {
 
 int i_input_device_SKNP(cpu *cpu) {
     printf("SKNP WIP");
+    return CONTINUE_CYCLE;
+}
+
+int i_LD_Fx33(cpu* cpu, uint8_t val) {
+    cpu->memory[cpu->I + 2] = val % 10;
+    cpu->memory[cpu->I + 1] = (val / 10) % 10;
+    cpu->memory[cpu->I]     = val / 100;
+
     return CONTINUE_CYCLE;
 }

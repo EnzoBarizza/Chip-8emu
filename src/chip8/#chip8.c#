@@ -62,13 +62,13 @@ void dump_memory(cpu* cpu) {
 
 instruction decode_instruction(uint16_t inst) {
     return (instruction) {
-        .A   = inst >> 12,
+        .A     = inst >> 12,
         .CD    = inst & 0x00FF,
         .D     = inst & 0x000F,
         .BCD   = inst & 0x0FFF,
         .B     = (inst >> 8) & 0x0F,
         .C     = (inst & 0x00FF) >> 4,
-        .ABCD = inst
+        .ABCD  = inst
     };
 }
 
@@ -109,7 +109,7 @@ int handle_H4B8(cpu *cpu, instruction inst) {
             break;
         case 0x1:
             //Continue substitution
-            cpu->V[inst.B] |= cpu->V[inst.C];
+	  ret = i_OR();
             break;
         case 0x2:
             cpu->V[inst.B] &= cpu->V[inst.C];
@@ -269,27 +269,4 @@ int cycle(cpu* cpu) {
     cpu->PC += 2;
 
     return code;
-}
-
-int main(void) {
-    srand(time(NULL));
-
-    cpu cpu = {0};
-    setup_memory(&cpu);
-
-    int should_quit = 0;
-    int quit_reason = 0;
-
-    while(!should_quit) {
-        int code = cycle(&cpu);
-
-        if(code != CONTINUE_CYCLE) {
-            should_quit = 1;
-            quit_reason = code;
-        }
-    }
-
-    if(quit_reason == ERROR_CODE) {
-        printf("%s", last_cycle_error);
-    }
 }
