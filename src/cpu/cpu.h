@@ -1,5 +1,5 @@
-#ifndef _CHIP8_H
-#define _CHIP8_H
+#ifndef _CPU_H
+#define _CPU_H
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -34,6 +34,7 @@ typedef struct {
     uint8_t DT;
     uint8_t ST;
     uint8_t SP;
+    uint8_t should_not_increment_pc;
     uint16_t stack[16];
     uint16_t I;
     uint16_t PC;

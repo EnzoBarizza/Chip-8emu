@@ -1,4 +1,4 @@
-#include "chip8.h"
+#include "cpu.h"
 #include "instructions.h"
 #include <time.h>
 
@@ -258,7 +258,8 @@ int cycle(cpu* cpu) {
 
     int code = handle_instruction(cpu ,inst);
 
-    cpu->PC += 2;
+    if(cpu->should_not_increment_pc) cpu->should_not_increment_pc = 0; 
+    else cpu->PC += 2;
 
     return code;
 }

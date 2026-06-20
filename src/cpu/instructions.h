@@ -1,7 +1,7 @@
 #ifndef _INSTRUCTIONS_H
 #define _INSTRUCTIONS_H
 
-#include "chip8.h"
+#include "cpu.h"
 
 //Common Instructions
 int i_RET(cpu* cpu);

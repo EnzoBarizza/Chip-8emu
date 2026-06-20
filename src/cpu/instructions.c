@@ -1,24 +1,25 @@
 #include "instructions.h"
-#include "chip8.h"
+#include "cpu.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 int i_display_device_CLS(cpu *cpu) {
     printf("\e[H\e[2J");
-    printf("\e[3J"); 
+    printf("\e[3J");
     return CONTINUE_CYCLE;
 }
 
 int i_RET(cpu* cpu) {
     if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
-    cpu->PC = cpu->stack[cpu->SP];
+    i_JP(cpu, cpu->stack[cpu->SP]);
     cpu->SP--;
     return CONTINUE_CYCLE;
 }
 
 int i_JP(cpu* cpu, uint16_t address) {
     cpu->PC = address;
+    cpu->should_not_increment_pc = 1;
     return CONTINUE_CYCLE;
 }
 
@@ -26,7 +27,7 @@ int i_CALL(cpu* cpu, uint16_t address) {
     if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
     cpu->stack[cpu->SP] = cpu->PC;
     cpu->SP++;
-    cpu->PC = address;
+    i_JP(cpu, address);
 
     return CONTINUE_CYCLE;
 }
@@ -59,7 +60,7 @@ int i_ADD(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_carry) {
     } else {
         *dest = v1 + v2;
     }
-    
+
     return CONTINUE_CYCLE;
 }
 
@@ -71,7 +72,7 @@ int i_ADD16(cpu* cpu, uint16_t* dest, uint16_t v1, uint16_t v2, int set_carry) {
     } else {
         *dest = v1 + v2;
     }
-    
+
     return CONTINUE_CYCLE;
 }
 
