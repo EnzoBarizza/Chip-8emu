@@ -5,4 +5,4 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory("src/cpu")
 add_subdirectory("src/devices")
-add_subdirectory("src/interface")
+add_subdirectory("src/runner")

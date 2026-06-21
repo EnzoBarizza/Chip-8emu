@@ -1,0 +1,2 @@
+Pixel position with wrapping is (Vx % 63, Vy % 31)
+Display index is display_buffer[Vx / 8][Vy / 8]
