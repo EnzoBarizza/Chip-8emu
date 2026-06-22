@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include <sys/types.h>
 #include <time.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -203,14 +204,14 @@ int handle_H4BE(cpu *cpu, instruction inst, bool decompile) {
                 printf("SKP V%X\n", inst.B);
                 return 0; 
             }
-            i_SKP(cpu);
+            i_SKP(cpu, cpu->V[inst.B]);
             break;
         case 0xA1:
             if (decompile) {
                 printf("SKNP V%X\n", inst.B);
                 return 0; 
             }
-            i_SKNP(cpu);
+            i_SKNP(cpu, cpu->V[inst.B]);
             break;
         default:
             if (decompile) {
@@ -605,24 +606,30 @@ int i_DRW(cpu* cpu, instruction inst) {
                 cpu->V[0xF] = 1;
             }
 
-            *screen_pixel ^= sprite_pixel;
+            *screen_pixel ^= sprite_pixel != 0 ? 0xFF : 0;
         }
     }
 
     return CONTINUE_CYCLE;
 }
 
-int i_SKP(cpu *cpu) {
+int i_SKP(cpu *cpu, uint8_t key) {
     #ifdef DEBUG8
     printf("SKP\n");
     #endif
+    if(cpu->keys_pressed[key] == true) {
+        cpu->PC += 2;
+    }
     return CONTINUE_CYCLE;
 }
 
-int i_SKNP(cpu *cpu) {
+int i_SKNP(cpu *cpu, uint8_t key) {
     #ifdef DEBUG8
     printf("SKNP\n");
     #endif
+    if(cpu->keys_pressed[key] == false) {
+        cpu->PC += 2;
+    }
     return CONTINUE_CYCLE;
 }
 
@@ -630,6 +637,7 @@ int i_LD_Vx_K(cpu *cpu) {
     #ifdef DEBUG8
     printf("LD Vx K\n");
     #endif
+    cpu->halted = true;
     return CONTINUE_CYCLE;
 }
 
@@ -674,28 +682,33 @@ int i_Fx65(cpu* cpu, uint8_t x) {
 
 int cycle(cpu* cpu) {
     double clocked = ((double) (clock() - cpu->last_cycle)) / CLOCKS_PER_SEC;
-    double clocked_dtst = ((double)clock() - cpu->last_dtst_cycle) / CLOCKS_PER_SEC;
+    double clocked_dtst = ((double) (clock() - cpu->last_dtst_cycle)) / CLOCKS_PER_SEC;
 
     if(clocked_dtst >= (double)1/60) {
         if(cpu->DT != 0) cpu->DT -= 1;
         if(cpu->ST != 0) cpu->ST -=1;
+
         cpu->last_dtst_cycle = clock();
     }
 
-    if(clocked >= (double)1/540) {
-        if(cpu->PC >= sizeof(cpu->memory)) return EOP;
-        uint8_t hb = cpu->memory[cpu->PC];
-        uint8_t lb = cpu->memory[cpu->PC + 1];
-
-        uint16_t binst = ((uint16_t) hb << 8) | lb;
-        instruction inst = decode_instruction(binst);
-
-        int code = handle_instruction(cpu, inst, false);
-
-        if(cpu->should_not_increment_pc) cpu->should_not_increment_pc = 0; 
-        else cpu->PC += 2;
+    if(clocked >= (double)1/1500) {
+        int code = CONTINUE_CYCLE;
 
         cpu->last_cycle = clock();
+
+        if(!cpu->halted) {
+            if(cpu->PC >= sizeof(cpu->memory)) return EOP;
+            uint8_t hb = cpu->memory[cpu->PC];
+            uint8_t lb = cpu->memory[cpu->PC + 1];
+
+            uint16_t binst = ((uint16_t) hb << 8) | lb;
+            instruction inst = decode_instruction(binst);
+
+            code = handle_instruction(cpu, inst, false);
+
+            if(cpu->should_not_increment_pc) cpu->should_not_increment_pc = 0; 
+            else cpu->PC += 2;
+        }
 
         return code;
     }

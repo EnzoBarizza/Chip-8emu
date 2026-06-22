@@ -1,5 +1,6 @@
 #include "runner.h"
 #include "cpu.h"
+#include "raylib.h"
 #include <display.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,12 +12,42 @@
 
 extern char* last_cycle_error;
 
+void update_keys(cpu* cpu) {
+    uint8_t chip8_keys[16] = {0x1, 0x2, 0x3, 0xC, 0x4, 0x5, 0x6, 0xD, 0x7, 0x8, 0x9, 0xE, 0xA, 0x0, 0xB, 0xF};
+    int32_t raylib_keys[16] = {KEY_ONE, KEY_TWO, KEY_THREE, KEY_FOUR, KEY_Q, KEY_W, KEY_E, KEY_R, KEY_A, KEY_S, KEY_D, KEY_F, KEY_Z, KEY_X, KEY_C, KEY_V};
+
+    bool old_state[16] = {};
+    memcpy(&old_state, cpu->keys_pressed, sizeof(bool) * 16);
+
+    PollInputEvents();
+
+    for(uint8_t i = 0; i < 16; i++) {
+        cpu->keys_pressed[i] = false;
+    }
+
+    for(uint8_t i = 0; i < 16; i++) {
+        cpu->keys_pressed[chip8_keys[i]] = IsKeyDown(raylib_keys[i]);
+    }
+
+    if(cpu->halted) {
+        for(uint8_t i = 0; i < 16; i++) {
+            if(old_state[chip8_keys[i]] != cpu->keys_pressed[chip8_keys[i]]) {
+                cpu->halted = false;
+                cpu->key_x = chip8_keys[i];
+            }
+        }
+    }
+}
+
 void run(cpu* cpu) {
+    init_display_device();
+
     uint8_t code = CONTINUE_CYCLE;
+
     while(code == CONTINUE_CYCLE) {
+        update_keys(cpu);
         code = cycle(cpu);
         run_frame(cpu->screen_buffer);
-        dump_memory(cpu);
     }
 
     printf("CODE = %d\n", code);
@@ -24,6 +55,8 @@ void run(cpu* cpu) {
     if(code == ERROR_CODE) {
         printf("ERROR: %s\n", last_cycle_error);
     }
+
+    deinit_display_device();
 }
 
 void decompile(cpu* cpu, size_t size) {
@@ -39,7 +72,6 @@ int main(int argc, const char* argv[]) {
         return -1;
     }
 
-    init_display_device();
     cpu cpu = {0};
     setup_memory(&cpu);
 

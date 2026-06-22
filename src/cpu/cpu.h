@@ -24,6 +24,9 @@ typedef struct cpu {
     uint8_t screen_buffer[32][64];
     clock_t last_cycle;
     clock_t last_dtst_cycle;
+    bool keys_pressed[16];
+    bool halted;
+    uint8_t key_x;
 } cpu;
 
 /*
@@ -77,8 +80,8 @@ int i_RND(struct cpu* cpu, uint8_t* dest, uint8_t and);
 //Device Instructions
 int i_CLS(struct cpu* cpu);
 int i_DRW(struct cpu* cpu, instruction inst);
-int i_SKP(struct cpu* cpu);
-int i_SKNP(struct cpu* cpu);
+int i_SKP(struct cpu* cpu, uint8_t key);
+int i_SKNP(struct cpu* cpu, uint8_t key);
 int i_LD_Vx_K(struct cpu* cpu);
 
 //Unique Instructions
