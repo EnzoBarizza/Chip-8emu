@@ -7,8 +7,6 @@
 #include <arpa/inet.h>
 #include <inttypes.h>
 
-//TODO: Fix carry flags at test 4 at chip8-test suit
-
 char* last_cycle_error;
 
 const uint8_t builtin_sprites[80] = {
@@ -100,7 +98,7 @@ int handle_H4B0(cpu *cpu, instruction inst, bool decompile) {
                 printf("CLS\n");
                 return 0; 
             }
-            i_display_device_CLS(cpu);
+            i_CLS(cpu);
             break;
         case 0x0EE:
             if (decompile) {
@@ -171,7 +169,7 @@ int handle_H4B8(cpu *cpu, instruction inst, bool decompile) {
                 printf("SHR V%X {, V%X}\n", inst.B, inst.C);
                 return 0; 
             }
-            ret = i_SHR(cpu, &cpu->V[inst.B]);
+            ret = i_SHR(cpu, &cpu->V[inst.B], cpu->V[inst.C]);
             break;
         case 0x7:
             if (decompile) {
@@ -185,7 +183,7 @@ int handle_H4B8(cpu *cpu, instruction inst, bool decompile) {
                 printf("SHL V%X {, V%X}\n", inst.B, inst.C);
                 return 0; 
             }
-            ret = i_SHL(cpu, &cpu->V[inst.B]);
+            ret = i_SHL(cpu, &cpu->V[inst.B], cpu->V[inst.C]);
             break;
         default:
             if (decompile) {
@@ -205,14 +203,14 @@ int handle_H4BE(cpu *cpu, instruction inst, bool decompile) {
                 printf("SKP V%X\n", inst.B);
                 return 0; 
             }
-            i_input_device_SKP(cpu);
+            i_SKP(cpu);
             break;
         case 0xA1:
             if (decompile) {
                 printf("SKNP V%X\n", inst.B);
                 return 0; 
             }
-            i_input_device_SKNP(cpu);
+            i_SKNP(cpu);
             break;
         default:
             if (decompile) {
@@ -240,7 +238,7 @@ int handle_H4BF(cpu *cpu, instruction inst, bool decompile) {
                 printf("LD V%X, K\n", inst.B);
                 return 0; 
             }
-            ret = i_input_device_LD_Vx_K(cpu);
+            ret = i_LD_Vx_K(cpu);
             break;
         case 0x15:
             if (decompile) {
@@ -389,7 +387,7 @@ int handle_instruction(cpu *cpu, instruction inst, bool decompile) {
                 printf("DRW V%X, V%X, %X\n", inst.B, inst.C, inst.D);
                 return 0; 
             }
-            ret = i_display_device_DRW(cpu, inst);
+            ret = i_DRW(cpu, inst);
             break;
         case 0xE:
             ret = handle_H4BE(cpu, inst, decompile);
@@ -408,7 +406,7 @@ int handle_instruction(cpu *cpu, instruction inst, bool decompile) {
     return ret;
 }
 
-int i_display_device_CLS(struct cpu* cpu) {
+int i_CLS(struct cpu* cpu) {
     #ifdef DEBUG8
     printf("CLS\n");
     #endif
@@ -484,8 +482,8 @@ int i_ADD(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_carry) {
     #endif
     if(set_carry) {
         uint16_t add = v1 + v2;
-        cpu->V[0xF] = add > 255;
         *dest = (uint8_t)(add & 0xFF);
+        cpu->V[0xF] = add > 255;
     } else {
         *dest = v1 + v2;
     }
@@ -536,17 +534,35 @@ int i_SUB(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_not_borrow) {
     #ifdef DEBUG8
     printf("SUB\n");
     #endif
-    cpu->V[0xF] = v1 > v2;
-    *dest = (v1 - v2) & 0xFF;
+    // cpu->V[0xF] = (v1 > v2) ? 1 : 0;
+    // *dest = v1 - v2;
+    uint8_t sub = v1 - v2;
+    uint8_t carry = v1 >= v2;
+    *dest = sub & 0xFF;
+    cpu->V[0xF] = carry;
     return CONTINUE_CYCLE;
 }
 
-int i_SHR(cpu* cpu, uint8_t* victim) {
+int i_SHR(struct cpu* cpu, uint8_t* dest, uint8_t val) {
     #ifdef DEBUG8
     printf("SHR\n");
     #endif
-    cpu->V[0xF] = *victim & (0x01);
-    *victim >>= 1;
+    *dest = val;
+    uint8_t carry = (*dest & 0x01);
+    *dest >>= 1;
+    cpu->V[0xF] = carry;
+    return CONTINUE_CYCLE;
+}
+
+int i_SHL(struct cpu* cpu, uint8_t* dest, uint8_t val) {
+    #ifdef DEBUG8
+    printf("SHL\n");
+    #endif
+    *dest = val;
+    uint8_t carry = (*dest & 0x80) != 0;
+    *dest <<= 1;
+    cpu->V[0xF] = carry;
+
     return CONTINUE_CYCLE;
 }
 
@@ -554,17 +570,8 @@ int i_SUBN(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2) {
     #ifdef DEBUG8
     printf("SUBN\n");
     #endif
-    cpu->V[0xF] = v2 > v1;
     *dest = v2 - v1;
-    return CONTINUE_CYCLE;
-}
-
-int i_SHL(cpu* cpu, uint8_t* victim) {
-    #ifdef DEBUG8
-    printf("SHL\n");
-    #endif
-    cpu->V[0xF] = (*victim & 0x10000000) != 0 ? 1 : 0 ;
-    *victim <<= 1;
+    cpu->V[0xF] = v2 >= v1;
     return CONTINUE_CYCLE;
 }
 
@@ -576,7 +583,7 @@ int i_RND(cpu* cpu, uint8_t* dest, uint8_t and) {
     return i_AND(cpu, dest, gen, and);
 }
 
-int i_display_device_DRW(cpu* cpu, instruction inst) {
+int i_DRW(cpu* cpu, instruction inst) {
     #ifdef DEBUG8
     printf("DRW\n");
     #endif
@@ -605,21 +612,21 @@ int i_display_device_DRW(cpu* cpu, instruction inst) {
     return CONTINUE_CYCLE;
 }
 
-int i_input_device_SKP(cpu *cpu) {
+int i_SKP(cpu *cpu) {
     #ifdef DEBUG8
     printf("SKP\n");
     #endif
     return CONTINUE_CYCLE;
 }
 
-int i_input_device_SKNP(cpu *cpu) {
+int i_SKNP(cpu *cpu) {
     #ifdef DEBUG8
     printf("SKNP\n");
     #endif
     return CONTINUE_CYCLE;
 }
 
-int i_input_device_LD_Vx_K(cpu *cpu) {
+int i_LD_Vx_K(cpu *cpu) {
     #ifdef DEBUG8
     printf("LD Vx K\n");
     #endif

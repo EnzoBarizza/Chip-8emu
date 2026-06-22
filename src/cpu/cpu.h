@@ -69,17 +69,17 @@ int i_OR(struct cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2);
 int i_AND(struct cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2);
 int i_XOR(struct cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2);
 int i_SUB(struct cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_not_borrow);
-int i_SHR(struct cpu* cpu, uint8_t* victim);
+int i_SHR(struct cpu* cpu, uint8_t* dest, uint8_t val);
+int i_SHL(struct cpu* cpu, uint8_t* dest, uint8_t val);
 int i_SUBN(struct cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2);
-int i_SHL(struct cpu* cpu, uint8_t* victim);
 int i_RND(struct cpu* cpu, uint8_t* dest, uint8_t and);
 
 //Device Instructions
-int i_display_device_CLS(struct cpu* cpu);
-int i_display_device_DRW(struct cpu* cpu, instruction inst);
-int i_input_device_SKP(struct cpu* cpu);
-int i_input_device_SKNP(struct cpu* cpu);
-int i_input_device_LD_Vx_K(struct cpu* cpu);
+int i_CLS(struct cpu* cpu);
+int i_DRW(struct cpu* cpu, instruction inst);
+int i_SKP(struct cpu* cpu);
+int i_SKNP(struct cpu* cpu);
+int i_LD_Vx_K(struct cpu* cpu);
 
 //Unique Instructions
 int i_Fx33(struct cpu* cpu, uint8_t val);

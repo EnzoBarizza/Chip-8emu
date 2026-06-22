@@ -10,6 +10,7 @@ int init_display_device() {
 };
 
 void run_frame(uint8_t screen_buffer[32][64]) {
+    PollInputEvents();
     BeginDrawing();
     ClearBackground(BLACK);
     for(int y = 0; y < 32; y++) {
