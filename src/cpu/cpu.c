@@ -4,7 +4,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 #include <inttypes.h>
+
+//TODO: Fix carry flags at test 4 at chip8-test suit
 
 char* last_cycle_error;
 
@@ -417,9 +420,8 @@ int i_RET(cpu* cpu) {
     #ifdef DEBUG8
     printf("RET\n");
     #endif
-    if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
-    i_JP(cpu, cpu->stack[cpu->SP]);
-    cpu->SP--;
+    if(handle_stack_over_or_under_flow(cpu) == ERROR_CODE) return ERROR_CODE;
+    cpu->PC = cpu->stack[--cpu->SP];
     return CONTINUE_CYCLE;
 }
 
@@ -436,10 +438,10 @@ int i_CALL(cpu* cpu, uint16_t address) {
     #ifdef DEBUG8
     printf("CALL\n");
     #endif
-    if(handle_stack_over_or_under_flow(cpu)) return ERROR_CODE;
-    cpu->stack[cpu->SP] = cpu->PC;
-    cpu->SP++;
-    i_JP(cpu, address);
+    if(cpu->SP > 16) return handle_stack_over_or_under_flow(cpu);
+    cpu->stack[cpu->SP++] = cpu->PC;
+    cpu->PC = address;
+    cpu->should_not_increment_pc = true;
 
     return CONTINUE_CYCLE;
 }
@@ -483,7 +485,7 @@ int i_ADD(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_carry) {
     if(set_carry) {
         uint16_t add = v1 + v2;
         cpu->V[0xF] = add > 255;
-        *dest = (uint8_t)(add & 0x00FF);
+        *dest = (uint8_t)(add & 0xFF);
     } else {
         *dest = v1 + v2;
     }
@@ -498,7 +500,7 @@ int i_ADD16(cpu* cpu, uint16_t* dest, uint16_t v1, uint16_t v2, int set_carry) {
     if(set_carry) {
         uint16_t add = v1 + v2;
         cpu->V[0xF] = add > 255;
-        *dest = (uint8_t)(add & 0x00FF);
+        *dest = (uint8_t)(add & 0xFF);
     } else {
         *dest = v1 + v2;
     }
@@ -535,7 +537,7 @@ int i_SUB(cpu* cpu, uint8_t* dest, uint8_t v1, uint8_t v2, int set_not_borrow) {
     printf("SUB\n");
     #endif
     cpu->V[0xF] = v1 > v2;
-    *dest = v1 - v2;
+    *dest = (v1 - v2) & 0xFF;
     return CONTINUE_CYCLE;
 }
 
@@ -543,7 +545,7 @@ int i_SHR(cpu* cpu, uint8_t* victim) {
     #ifdef DEBUG8
     printf("SHR\n");
     #endif
-    cpu->V[0xF] = *victim & (0b00000001);
+    cpu->V[0xF] = *victim & (0x01);
     *victim >>= 1;
     return CONTINUE_CYCLE;
 }
@@ -628,10 +630,10 @@ int i_Fx33(cpu* cpu, uint8_t val) {
     #ifdef DEBUG8
     printf("Fx33\n");
     #endif
-    cpu->memory[cpu->I + 2] = val % 10;
-    cpu->memory[cpu->I + 1] = (val / 10) % 10;
-    cpu->memory[cpu->I]     = val / 100;
 
+    cpu->memory[cpu->I] = (val / 100) % 10;
+    cpu->memory[cpu->I + 1] = (val / 10) % 10;
+    cpu->memory[cpu->I + 2] = val % 10;
     return CONTINUE_CYCLE;
 }
 
@@ -648,7 +650,7 @@ int i_Fx55(cpu* cpu, uint8_t x) {
     printf("Fx55\n");
     #endif
     for(int i = 0; i <= x; i++) {
-        cpu->memory[cpu->I + x] = cpu->V[x];
+        cpu->memory[cpu->I + i] = cpu->V[i];
     }
     return CONTINUE_CYCLE;
 }
@@ -658,13 +660,20 @@ int i_Fx65(cpu* cpu, uint8_t x) {
     printf("Fx65\n");
     #endif
     for(int i = 0; i <= x; i++) {
-        cpu->V[x] = cpu->memory[cpu->I + x];
+        cpu->V[i] = cpu->memory[cpu->I + i];
     }
     return CONTINUE_CYCLE;
 }
 
 int cycle(cpu* cpu) {
     double clocked = ((double) (clock() - cpu->last_cycle)) / CLOCKS_PER_SEC;
+    double clocked_dtst = ((double)clock() - cpu->last_dtst_cycle) / CLOCKS_PER_SEC;
+
+    if(clocked_dtst >= (double)1/60) {
+        if(cpu->DT != 0) cpu->DT -= 1;
+        if(cpu->ST != 0) cpu->ST -=1;
+        cpu->last_dtst_cycle = clock();
+    }
 
     if(clocked >= (double)1/540) {
         if(cpu->PC >= sizeof(cpu->memory)) return EOP;

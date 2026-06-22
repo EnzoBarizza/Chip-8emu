@@ -9,7 +9,7 @@
 
 #define CONTINUE_CYCLE 0
 #define EOP 1
-#define ERROR_CODE -1
+#define ERROR_CODE 2
 
 typedef struct cpu {
     uint8_t memory[4096];
@@ -23,6 +23,7 @@ typedef struct cpu {
     uint16_t PC;
     uint8_t screen_buffer[32][64];
     clock_t last_cycle;
+    clock_t last_dtst_cycle;
 } cpu;
 
 /*

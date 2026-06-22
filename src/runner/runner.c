@@ -9,12 +9,20 @@
 #include <unistd.h>
 #include <threads.h>
 
+extern char* last_cycle_error;
+
 void run(cpu* cpu) {
     uint8_t code = CONTINUE_CYCLE;
-    while(code != EOP) {
+    while(code == CONTINUE_CYCLE) {
         code = cycle(cpu);
         run_frame(cpu->screen_buffer);
         dump_memory(cpu);
+    }
+
+    printf("CODE = %d\n", code);
+
+    if(code == ERROR_CODE) {
+        printf("ERROR: %s\n", last_cycle_error);
     }
 }
 
