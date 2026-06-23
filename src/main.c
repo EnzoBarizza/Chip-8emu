@@ -44,17 +44,17 @@ void update_keys(cpu* cpu) {
 
 void run(cpu* cpu) {
     InitWindow(640, 320, "Chip-8 emu");
+    
+    SetAudioStreamBufferSizeDefault(AUDIO_BUFFER_SIZE);
     InitAudioDevice();
 
-    SetAudioStreamBufferSizeDefault(AUDIO_BUFFER_SIZE);
     float audio_buffer[AUDIO_BUFFER_SIZE] = {0};
 
     AudioStream audio_stream = LoadAudioStream(SAMPLE_RATE, 32, 1);
     SetAudioStreamPan(audio_stream, 0.0f);
-    PlayAudioStream(audio_stream);
     SetAudioStreamVolume(audio_stream, 0.3f);
 
-    int32_t sine_freq = 440;
+    int32_t sine_freq = 200;
     int32_t sine_index = 0;
     double sine_stime = 0.0;
 
@@ -64,21 +64,27 @@ void run(cpu* cpu) {
         update_keys(cpu);
         code = cycle(cpu);
 
-        if(cpu->ST != 0) {
-            if(IsAudioStreamProcessed(audio_stream)) {
-                for(uint32_t i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-                    uint32_t wavelength = SAMPLE_RATE/sine_freq;
-                    audio_buffer[i] = sin(2*PI*sine_index/wavelength);
-                    sine_index++;
+        if(IsAudioStreamProcessed(audio_stream)) {
+            for(uint32_t i = 0; i < AUDIO_BUFFER_SIZE; i++) {
+                uint32_t wavelength = SAMPLE_RATE/sine_freq;
+                audio_buffer[i] = sin(2*PI*sine_index/wavelength);
+                sine_index++;
 
-                    if(sine_index >= wavelength) {
-                        sine_index = 0;
-                        sine_stime = GetTime();
-                    }
+                if(sine_index >= wavelength) {
+                    sine_index = 0;
+                    sine_stime = GetTime();
                 }
-
-                UpdateAudioStream(audio_stream, audio_buffer, AUDIO_BUFFER_SIZE);
             }
+
+            UpdateAudioStream(audio_stream, audio_buffer, AUDIO_BUFFER_SIZE);
+        }
+
+        if(cpu->ST != 0) {
+            if(!IsAudioStreamPlaying(audio_stream)) {
+                PlayAudioStream(audio_stream);
+            }
+        } else if(IsAudioStreamPlaying(audio_stream)) {
+            StopAudioStream(audio_stream);
         }
 
         BeginDrawing();
