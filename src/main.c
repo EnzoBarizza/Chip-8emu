@@ -1,5 +1,6 @@
 #include "cpu.h"
 
+#include <math.h>
 #include <raylib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,6 +9,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <threads.h>
+
+#define AUDIO_BUFFER_SIZE 4096
+#define SAMPLE_RATE 44100
 
 extern char* last_cycle_error;
 
@@ -42,11 +46,40 @@ void run(cpu* cpu) {
     InitWindow(640, 320, "Chip-8 emu");
     InitAudioDevice();
 
+    SetAudioStreamBufferSizeDefault(AUDIO_BUFFER_SIZE);
+    float audio_buffer[AUDIO_BUFFER_SIZE] = {0};
+
+    AudioStream audio_stream = LoadAudioStream(SAMPLE_RATE, 32, 1);
+    SetAudioStreamPan(audio_stream, 0.0f);
+    PlayAudioStream(audio_stream);
+    SetAudioStreamVolume(audio_stream, 0.3f);
+
+    int32_t sine_freq = 440;
+    int32_t sine_index = 0;
+    double sine_stime = 0.0;
+
     uint8_t code = CONTINUE_CYCLE;
 
     while(code == CONTINUE_CYCLE) {
         update_keys(cpu);
         code = cycle(cpu);
+
+        if(cpu->ST != 0) {
+            if(IsAudioStreamProcessed(audio_stream)) {
+                for(uint32_t i = 0; i < AUDIO_BUFFER_SIZE; i++) {
+                    uint32_t wavelength = SAMPLE_RATE/sine_freq;
+                    audio_buffer[i] = sin(2*PI*sine_index/wavelength);
+                    sine_index++;
+
+                    if(sine_index >= wavelength) {
+                        sine_index = 0;
+                        sine_stime = GetTime();
+                    }
+                }
+
+                UpdateAudioStream(audio_stream, audio_buffer, AUDIO_BUFFER_SIZE);
+            }
+        }
 
         BeginDrawing();
         ClearBackground(BLACK);
@@ -65,8 +98,9 @@ void run(cpu* cpu) {
         printf("ERROR: %s\n", last_cycle_error);
     }
 
-    CloseWindow();
+    UnloadAudioStream(audio_stream);
     CloseAudioDevice();
+    CloseWindow();
 }
 
 void decompile(cpu* cpu, size_t size) {
