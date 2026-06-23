@@ -1,7 +1,6 @@
-#include "runner.h"
 #include "cpu.h"
-#include "raylib.h"
-#include <display.h>
+
+#include <raylib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,14 +39,24 @@ void update_keys(cpu* cpu) {
 }
 
 void run(cpu* cpu) {
-    init_display_device();
+    InitWindow(640, 320, "Chip-8 emu");
+    InitAudioDevice();
 
     uint8_t code = CONTINUE_CYCLE;
 
     while(code == CONTINUE_CYCLE) {
         update_keys(cpu);
         code = cycle(cpu);
-        run_frame(cpu->screen_buffer);
+
+        BeginDrawing();
+        ClearBackground(BLACK);
+        for(int y = 0; y < 32; y++) {
+            for(int x = 0; x < 64; x++) {
+                if(cpu->screen_buffer[y][x] != 0)
+                    DrawRectangle(x*10, y*10, 10, 10, RAYWHITE);
+            }
+        }
+        EndDrawing();
     }
 
     printf("CODE = %d\n", code);
@@ -56,7 +65,8 @@ void run(cpu* cpu) {
         printf("ERROR: %s\n", last_cycle_error);
     }
 
-    deinit_display_device();
+    CloseWindow();
+    CloseAudioDevice();
 }
 
 void decompile(cpu* cpu, size_t size) {
